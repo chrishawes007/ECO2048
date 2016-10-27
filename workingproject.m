@@ -1,11 +1,8 @@
 %% Import and sort data
 
-%We may have to calculate point per game/points per minute in the excel
-%file and then simply use them in Matlab
-    
-% Import data in the form of column vectors
-
-T = readtable('samplematlab2.xls','ReadRowNames',true); %This creates a table with the names as the row names
+% Import data into a table with the playernames as row names and the
+% variables as the column names
+T = readtable('samplematlab2.xls','ReadRowNames',true); 
     
 T.MinutePoints = T.No_OfTimesLessThan60*1+T.No_OfTimesMoreThan60*2;  %Less than 60 - 1 point. More than 60 - 2 points
 T.assistpoints = T.CleanSheets*3; % Goal Assist = 3
@@ -14,9 +11,8 @@ T.PenaltyConcededPoints = T.PenaltyMisses*(-2); %Penalty Miss - (-2)
 T.YellowCardPoints = T.Yellows*(-1); %Yellow Card  (-1)
 T.RedCardPoints = T.Reds*(-3); %Red Card (-3)
 T.OwnGoalPoints = T.OwnGoal*(-2); %Own Goal (-2)
-T.ShotSavePoints = T.x3ShotSaves*1 %3 shot saves goalkeepers - 1
-T.ConcPoints = T.x2GoalsConceded*(-1) % 2 goals conceded by keeper/defender - (-1)
-
+T.ShotSavePoints = T.x3ShotSaves*1; %3 shot saves goalkeepers - 1
+T.ConcPoints = T.x2GoalsConceded*(-1); % 2 goals conceded by keeper/defender - (-1)
 
 %Clean Sheet Goalkeeper/Defender - 4
 % Forward - 1
@@ -28,7 +24,7 @@ elseif strcmp(T.Position,'Midfielder');
     T.CleanSheetPoints = T.CleanSheets*1;
 else strcmp(T.Position,'Forward');
     T.CleanSheetPoints = T.CleanSheets*0;
-end
+end;
 
 %Goal scored by goalkeeper or defender - 6 points
 % Midfielder - 5
@@ -42,12 +38,12 @@ elseif strcmp(T.Position,'Midfielder');
     T.goalpoints = T.GoalsScored*5;
 else strcmp(T.Position,'Forward');
     T.goalpoints = T.GoalsScored*4;
-end
+end;
+
 %Sum all calculated points
 T.SumOfPoints = T.MinutePoints + T.assistpoints+T.PenaltyPoints+T.PenaltyConcededPoints+T.YellowCardPoints+T.RedCardPoints+T.OwnGoalPoints+T.ShotSavePoints+T.ConcPoints+T.goalpoints+T.CleanSheetPoints;
 
-T1 = T(:,{'Position','Price','SumOfPoints'}) %Creates sub-table with the important data types 
-
+T1 = T(:,{'Position','Price','SumOfPoints'}) %Creates sub-table with the important data types. This needs to be extended to others but this is bare bones at the moment
 
 
 %% Define constraints
@@ -58,7 +54,7 @@ T1 = T(:,{'Position','Price','SumOfPoints'}) %Creates sub-table with the importa
 % Maximum number of players strictly equal to 15
 
 
-% Budget £100m 
+% Budget Â£100m 
 
 
 % Goalkeepers must be equal to 2
@@ -73,7 +69,7 @@ T1 = T(:,{'Position','Price','SumOfPoints'}) %Creates sub-table with the importa
 % Attackers equal to 3
 
 
-% Maximum 11 players
+% Maximum 3 players from each team
 
 
 % OPTIONAL: SELECTING A CAPTAIN - SCORE DOUBLED
@@ -89,7 +85,9 @@ T1 = T(:,{'Position','Price','SumOfPoints'}) %Creates sub-table with the importa
     % The most obvious way of doing this is to optimise for the best 15
     % players in each respective position although we could choose to
     % optimise for the first 12 and have the best three cheapest players 
-    % make up the rest of the spots.
+    % make up the rest of the spots. There could be two options - if x = 1
+    % (user defined) it does one calculates best over all 15 or is x = 2 it
+    % does the best 11)
 
 
 
