@@ -2,54 +2,119 @@
 
 % Import data into a table with the playernames as row names and the
 % variables as the column names
-T = readtable('Goalkeeper.xlsx','ReadRowNames',true); 
+T = readtable('summarystatistics.xlsx','ReadRowNames',true) 
 U = readtable('GoalsConcededPerClub.xlsx','ReadRowNames',true);
 
-T.YellowCardP = T.YellowCards*(-1); %Yellow Card  (-1)
+%% Setting initial conditions for goalsconcededover 2
+% Calculating the goals conceded over 2 
+U.ConcededOver2 = U.x3Conceded+U.x4Conceded;
+U.PercentOver2 = U.ConcededOver2/38
+U = U.PercentOver2;
+
+T = sortrows(T,'Club');
+x = T.Club %Creates array 
+[Teams,b,id] = unique(x);
+occurrences = histc(id,1:max(id));
+T1 = table(Teams,occurrences); %Calculates occurrences of each team
+T1.CumSum = cumsum(T1.occurrences) %Calculate sum of 
+
+%Use the cumsum of t1 to create a new matrix with 20 different numbers
+%lasting the difference between cumsum 
+
+%create matrix of ones equal to size of T1
+x = size(T)
+inputmatrix = ones(x(1),1)
+
+%replace each team in a loop using U
+
+for i=1:20
+    if i == 1
+        inputmatrix(1:T1.CumSum(i))=U(i)
+    else
+        inputmatrix(T1.CumSum(i-1):T1.CumSum(i))=U(i)
+    end
+end
+
+%combine matrix with table
+X = array2table(inputmatrix,'VariableNames',{'PercentageOver2'})
+T = [T,X]
+%%
+
+%Set for ease
+GK = 'Goalkeeper';
+DF = 'Defender';
+MF = 'Midfielder';
+FW = 'Forward';
+
+T.YellowCardP = T.YellowCards*(-1); %Yellow Card = (-1)
 T.AssistP = T.Assists*3; % Goal Assist = 3
-T.PenaltyP = T.PenaltiesSaved*5; %Penalty save - 5
-T.RedCardP = T.RedCards*(-3); %Red Card (-3)
-T.OwnGoalP = T.OwnGoals*(-2); %Own Goal (-2)
+T.PenaltyP = T.PenaltiesSaved*5; %Penalty save = 5
+T.RedCardP = T.RedCards*(-3); %Red Card = (-3)
+T.OwnGoalP = T.OwnGoals*(-2); %Own Goal = (-2)
 
-%Clean Sheet Goalkeeper/Defender - 4, Forward - 1
-if strcmp(T.Position,'Goalkeeper');
-   T.CleanSheetP = T.CleanSheet*4;
-elseif strcmp(T.Position,'Defender');      
-   T.CleanSheetP = T.CleanSheet*4;    
-elseif strcmp(T.Position,'Midfielder');
-    T.CleanSheetP = T.CleanSheet*1;
-else strcmp(T.Position,'Forward');
-    T.CleanSheetP = T.CleanSheet*0;
+% Goalscored by GK or DF - 6 points, Midfielder - 5, Forward - 4
+% Save points is 1 if gk, 0 if anything else
+% 1 point scored for every three saves made.
+% If GK or DF, -1 points for every 2 goals conceded, MF or FW 0 
+
+
+T.averageshotsaves = T.Saves/3; % Roughly number of times three saves made
+T.AvShotP = round(T.averageshotsaves);%Rounding the figure
+
+for i=1:434 %strcmp doens't work on its own, NEEDS 'I'
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.GoalP(i) = T.Goals(i)*6;
+        T.CleanSheetP(i) = T.CleanSheet(i)*4;
+        T.saveP(i) = T.averageshotsavesround(i)*1;
+        T.ConcededP(i) = round(T.Appearances(i)*T.PercentageOver2(i)*(-1));
+    elseif strcmp(T.Position(i),'Defender')
+        T.GoalP(i) = T.Goals(i)*6;    
+        T.CleanSheetP(i) = T.CleanSheet(i)*4;
+        T.saveP(i) = T.averageshotsavesround(i)*0;
+        T.ConcededP(i) = round(T.Appearances(i)*T.PercentageOver2(i)*(-1));
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.GoalP(i) = T.Goals(i)*5;
+        T.CleanSheetP(i) = T.CleanSheet(i)*1;
+        T.saveP(i) = T.averageshotsavesround(i)*0;
+        T.ConcededP(i) = T.Appearances(i)*T.PercentageOver2(i)*0;
+    else strcmp(T.Position(i),'Forward')
+        T.GoalP(i) = T.Goals(i)*4;
+        T.CleanSheetP(i) = T.CleanSheet(i)*0;
+        T.saveP(i) = T.averageshotsavesround(i)*0;
+        T.ConcededP(i) = T.Appearances(i)*T.PercentageOver2(i)*0;
+    end;
+    %Minutes per game: Less than 60 - 1 point / More than 60 - 2 points
+    if T.MinutesPerGame(i) > 60;
+        T.MinuteP(i) = T.Appearances(i)*2;
+    else T.MinutesPerGame(i) < 60;
+        T.MinuteP(i) = T.Appearances(i)*1;
+    end;
 end;
 
-%Goal scored by goalkeeper or defender - 6 points, Midfielder - 5 & Forward
-% - 4
-if strcmp(T.Position,'Goalkeeper');
-   T.GoalP = T.Goals*6;
-elseif strcmp(T.Position,'Defender');
-   T.GoalP == T.Goals*6;    
-elseif strcmp(T.Position,'Midfielder');
-    T.GoalP = T.Goals*5;
-else strcmp(T.Position,'Forward');
-    T.GoalP = T.Goals*4;
-end;
+%Only thing left to do is penalty misses, but these are all for forwards 
+% and at the moment these haven't been done
 
-%Minutes per game: Less than 60 - 1 point / More than 60 - 2 points
-if T.MinutesPerGame > 60;
-   T.MinuteP = T.Appearances*2;
-else T.MinutesPerGame < 60;
-   T.MinuteP = T.Appearances*1;
-end;
+%% Sum and create new table with key variables
 
-T.averageshotsaves = T.Saves/3;
-T.averageshotsavesround = round(T.averageshotsaves);%Rounding the figure
-if strcmp(T.Position,'Goalkeeper');
-    T.saveP = T.averageshotsavesround*1;
-else T.saveP = 0
-end  %3 shot saves goalkeepers - 1
+%Add Penalty Misses
+T.SumP = T.MinuteP+T.ConcededP+T.saveP+T.CleanSheetP+T.GoalP+...
+    T.AvShotP+T.YellowCardP+T.AssistP+T.PenaltyP+T.RedCardP...
+    +T.OwnGoalP
 
+T1 = T(:,{'Club','Position','Value','SumP'}) %Creates sub-table with the important data types. This needs to be extended to others but this is bare bones at the moment
+  
+    
+%% This doesn't do anything but may be useful
+clubnames = unique(T.Club)
+for i=clubnames %Splits them into clubs
+    for j = 1:20
+    x{j} = T(strcmp(T.Club,i{j}),:);
+    end
+end   
 
-%% This bit doesn't actually work yet so if you want to try the code run the section above only! 
+%% Alternative calculation for conceding over 2
+%I may try and make this work
+
 U1 = U(1,:);
 U2 = U(2,:);
 U3 = U(3,:);
@@ -71,231 +136,208 @@ U18 = U(18,:);
 U19 = U(19,:);
 U20 = U(20,:);
 
-%This still needs work. It works for one entry however creates an array for
-%more than one entry. Speak to Antonio/lab man for further advice is the
-%best way to go.
-
-if strcmp(T.Club,'Arsenal') 
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U1.ConcededOver2*(-1);
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U1.ConcededOver2*(-1);
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U1.ConcededOver2*(0);
-    else trcmp(T.Position,'Forward')
-        T.ConcededP = U1.ConcededOver2*(0);
+if strcmp(T.Club(i),'AFC Bournemouth')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U1.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U1.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U1.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U1.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Aston Villa')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U2.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U2.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U2.ConcededOver2*(0)
-    else trcmp(T.Position,'Forward')
-        T.ConcededP = U2.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Arsenal') 
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U2.ConcededOver2*(-1);
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U2.ConcededOver2*(-1);
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U2.ConcededOver2*(0);
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U2.ConcededOver2*(0);
     end
-elseif strcmp(T.Club,'Bournemouth')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U3.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U3.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U3.ConcededOver2*(0)
-    else trcmp(T.Position,'Forward')
-        T.ConcededP = U3.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Aston Villa')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U3.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U3.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U3.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U3.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Chelsea')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U4.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U4.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U4.ConcededOver2*(0)
-    else trcmp(T.Position,'Forward')
-        T.ConcededP = U4.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Chelsea')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U4.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U4.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U4.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U4.ConcededOver2*(0)
     end
-elseif  strcmp(T.Club,'Crystal Palace')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U5.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U5.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U5.ConcededOver2*(0)
-    else trcmp(T.Position,'Forward')
-        T.ConcededP = U5.ConcededOver2*(0)
+elseif  strcmp(T.Club(i),'Crystal Palace')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U5.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U5.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U5.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U5.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Everton')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U6.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U6.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U6.ConcededOver2*(0)
-    else trcmp(T.Position,'Forward')
-        T.ConcededP = U6.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Everton')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U6.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U6.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U6.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U6.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Leicester City')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U7.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U7.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U7.ConcededOver2*(0)
-    else trcmp(T.Position,'Forward')
-        T.ConcededP = U7.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Leicester City')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U7.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U7.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U7.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U7.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Liverpool')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U8.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U8.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U8.ConcededOver2*(0)
-    else trcmp(T.Position,'Forward')
-        T.ConcededP = U8.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Liverpool')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U8.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U8.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U8.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U8.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Manchester City')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U9.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U9.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U9.ConcededOver2*(0)
-    else trcmp(T.Position,'Forward')
-        T.ConcededP = U9.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Manchester City')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U9.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U9.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U9.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U9.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Manchester United')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U10.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U10.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U10.ConcededOver2*(0)
-    else trcmp(T.Position,'Forward')
-        T.ConcededP = U10.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Manchester United')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U10.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U10.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U10.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U10.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Newcastle United')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U11.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U11.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U11.ConcededOver2*(0)
-    else strcmp(T.Position,'Forward')
-        T.ConcededP = U11.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Newcastle United')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U11.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U11.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U11.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U11.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Norwich City')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U12.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U12.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U12.ConcededOver2*(0)
-    else strcmp(T.Position,'Forward')
-        T.ConcededP = U12.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Norwich City')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U12.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U12.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U12.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U12.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Southampton')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U13.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U13.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U13.ConcededOver2*(0)
-    else strcmp(T.Position,'Forward')
-        T.ConcededP = U13.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Southampton')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U13.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U13.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U13.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U13.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Stoke City')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U14.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U14.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U14.ConcededOver2*(0)
-    else strcmp(T.Position,'Forward')
-        T.ConcededP = U14.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Stoke City')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U14.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U14.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U14.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U14.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Sunderland')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U15.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U15.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U15.ConcededOver2*(0)
-    else strcmp(T.Position,'Forward')
-        T.ConcededP = U15.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Sunderland')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U15.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U15.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U15.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U15.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Swansea City')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U16.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U16.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U16.ConcededOver2*(0)
-    else strcmp(T.Position,'Forward')
-        T.ConcededP = U16.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Swansea City')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U16.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U16.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U16.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U16.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Tottenham')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U17.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U17.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U17.ConcededOver2*(0)
-    else strcmp(T.Position,'Forward')
-        T.ConcededP = U17.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Tottenham')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U17.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U17.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U17.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U17.ConcededOver2*(0)
     end
-elseif strcmp(T.Club,'Watford')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U18.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U18.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U18.ConcededOver2*(0)
-    else strcmp(T.Position,'Forward')
-        T.ConcededP = U18.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'Watford')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U18.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U18.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U18.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U18.ConcededOver2*(0)
     end  
-elseif strcmp(T.Club,'West Bromwich')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U19.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U19.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U19.ConcededOver2*(0)
-    else strcmp(T.Position,'Forward')
-        T.ConcededP = U19.ConcededOver2*(0)
+elseif strcmp(T.Club(i),'West Bromwich')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U19.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U19.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U19.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U19.ConcededOver2*(0)
     end
-else strcmp(T.Club,'West Ham Utd')
-    if strcmp(T.Position,'Goalkeeper')
-        T.ConcededP = U20.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Defender')
-        T.ConcededP = U20.ConcededOver2*(-1)
-    elseif strcmp(T.Position,'Midfielder')
-        T.ConcededP = U20.ConcededOver2*(0)
-    else strcmp(T.Position,'Forward')
-        T.ConcededP = U20.ConcededOver2*(0)
+else strcmp(T.Club(i),'West Ham Utd')
+    if strcmp(T.Position(i),'Goalkeeper')
+        T.ConcededP(i) = U20.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Defender')
+        T.ConcededP(i) = U20.ConcededOver2*(-1)
+    elseif strcmp(T.Position(i),'Midfielder')
+        T.ConcededP(i) = U20.ConcededOver2*(0)
+    else strcmp(T.Position(i),'Forward')
+        T.ConcededP(i) = U20.ConcededOver2*(0)
     end
 end
           
-%%
-
-%T.averagesgoalsconceded = T.GoalsConceded/2 
-%T.averagesgoalsconcededround = round(T.averagesgoalsconceded) %Rounding the figure
-%if strcmp(T.Position,'Goalkeeper');
- %  T.GoalsConcededP = T.averagesgoalsconcededround*(-1);
-%elseif strcmp(T.Position,'Defender');
- %  T.GoalsConcededP = T.averagesgoalsconcededround*(-1);
-%elseif strcmp(T.Position,'Midfielder');
- %   T.GoalsConcededP = T.averagesgoalsconcededround*(0);
-%else strcmp(T.Position,'Forward');
- %   T.GoalsConcededP = T.averagesgoalsconcededround*(0);
-%end
-%Sum all calculated points
-
-T.SumOfPoints = T.MinutePoints + T.assistpoints+T.PenaltyPoints+T.PenaltyConcededPoints+T.YellowCardPoints+T.RedCardPoints+T.OwnGoalPoints+T.ShotSavePoints+T.ConcPoints+T.goalpoints+T.CleanSheetPoints;
-
-T1 = T(:,{'Position','Price','SumOfPoints'}) %Creates sub-table with the important data types. This needs to be extended to others but this is bare bones at the moment
-T.PenaltyMissP = T.PenaltyMisses*(-2); %Penalty Miss - (-2)
 
 %% Define constraints
 % Maximum number of players strictly equal to 15
